@@ -28,9 +28,16 @@ final class StatusItemController: NSObject {
 
     var isCollapsed: Bool { engine?.isCollapsed ?? false }
     var separatorLength: Double { Double(separatorItem?.length ?? 0) }
+    var separatorVisible: Bool { separatorItem?.isVisible ?? false }
 
     var toggleFrame: NSRect? { toggleItem.button?.window?.frame }
-    var separatorFrame: NSRect? { separatorItem?.button?.window?.frame }
+    /// Hidden status items keep a stale window parked off-layout, so visibility
+    /// has to be part of the answer; otherwise callers compute drops against
+    /// coordinates like (0, -15).
+    var separatorFrame: NSRect? {
+        guard separatorItem?.isVisible != false else { return nil }
+        return separatorItem?.button?.window?.frame
+    }
     var canaryFrame: NSRect? { canaryItem?.button?.window?.frame }
     var canaryOnScreen: Bool {
         guard let frame = canaryFrame else { return false }
@@ -81,8 +88,16 @@ final class StatusItemController: NSObject {
         }
 
         if capability.kind == .lengthSpacer {
+            // AppKit persists NSStatusItem.isVisible per autosave name. A single
+            // hidden state — ours or another tool's — would otherwise keep the
+            // separator invisible forever, and the engine cannot collapse without
+            // it. Clear the stale flag and force the item back on.
+            let defaults = UserDefaults.standard
+            defaults.removeObject(forKey: "NSStatusItem VisibleCC \(Self.separatorAutosaveName)")
+            defaults.removeObject(forKey: "NSStatusItem Visible \(Self.separatorAutosaveName)")
             separatorItem = NSStatusBar.system.statusItem(withLength: CGFloat(MenuBarGeometry.expandedLength))
             separatorItem?.autosaveName = Self.separatorAutosaveName
+            separatorItem?.isVisible = true
             if let separator = separatorItem {
                 separator.button?.title = ""
                 separator.button?.image = nil
@@ -149,6 +164,7 @@ final class StatusItemController: NSObject {
             "engine": .string(engine.kind.rawValue),
             "engineAvailable": .bool(engine.isAvailable),
             "separatorLength": .number(separatorLength),
+            "separatorVisible": .bool(separatorVisible),
             "capability": .string(capability.detail),
             "osVersion": .string(capability.osVersion),
             "testMode": .bool(testMode),

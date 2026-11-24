@@ -17,6 +17,9 @@ public enum ControlErrorCode {
     public static let timeout = "timeout"
     public static let conflict = "conflict"
     public static let unsupported = "unsupported"
+    /// Icon management needs the Accessibility permission; the folding engine
+    /// does not. Kept separate from `unsupported` so clients can offer a fix.
+    public static let permissionDenied = "permission_denied"
 }
 
 public enum ControlExitCode: Int32, Sendable {
@@ -128,6 +131,13 @@ public enum ControlCommand {
     public static let logsTail = "logs.tail"
     public static let appQuit = "app.quit"
     public static let appSettings = "app.settings"
+    public static let itemsList = "items.list"
+    public static let itemsMove = "items.move"
+    public static let itemsJob = "items.job"
+    public static let itemsUndo = "items.undo"
+    public static let layoutGet = "layout.get"
+    public static let layoutSnapshot = "layout.snapshot"
+    public static let permissionsStatus = "permissions.status"
 
     public static let all: Set<String> = [
         ping, status, collapse, expand, toggle, probe, hoverSimulate,
@@ -136,5 +146,6 @@ public enum ControlCommand {
         loginItemStatus, loginItemEnable, loginItemDisable,
         updateStatus, updateCheck, updateInstall,
         selfTest, logsTail, appQuit, appSettings,
+        itemsList, itemsMove, itemsJob, itemsUndo, layoutGet, layoutSnapshot, permissionsStatus,
     ]
 }

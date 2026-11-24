@@ -31,6 +31,7 @@ final class SettingsStore: ObservableObject {
         static let collapseDelay = "barfold.collapseDelay"
         static let hotkey = "barfold.hotkey"
         static let showNewIconHint = "barfold.showNewIconHint"
+        static let autoHideNewItems = "barfold.autoHideNewItems"
         static let hasCompletedOnboarding = "barfold.hasCompletedOnboarding"
         static let updateAutomatically = "barfold.updateAutomatically"
         static let engineOverride = "barfold.engineOverride"
@@ -61,6 +62,12 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(showNewIconHint, forKey: Keys.showNewIconHint) }
     }
 
+    /// New extras are moved into the hidden group on the left, per the user's
+    /// choice. Off by default only if the user turns it off.
+    @Published var autoHideNewItems: Bool {
+        didSet { defaults.set(autoHideNewItems, forKey: Keys.autoHideNewItems) }
+    }
+
     @Published var hasCompletedOnboarding: Bool {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
     }
@@ -88,6 +95,7 @@ final class SettingsStore: ObservableObject {
         self.autoCollapseEnabled = defaults.object(forKey: Keys.autoCollapseEnabled) as? Bool ?? true
         self.collapseDelay = defaults.object(forKey: Keys.collapseDelay) as? Double ?? 0.6
         self.showNewIconHint = defaults.object(forKey: Keys.showNewIconHint) as? Bool ?? true
+        self.autoHideNewItems = defaults.object(forKey: Keys.autoHideNewItems) as? Bool ?? true
         self.hasCompletedOnboarding = defaults.object(forKey: Keys.hasCompletedOnboarding) as? Bool ?? false
         self.updateAutomatically = defaults.object(forKey: Keys.updateAutomatically) as? Bool ?? true
         self.engineOverride = defaults.string(forKey: Keys.engineOverride) ?? "auto"
@@ -121,6 +129,7 @@ final class SettingsStore: ObservableObject {
             "hotkeyKeyCode": hotkey.map { .number(Double($0.keyCode)) } ?? .null,
             "hotkeyModifiers": hotkey.map { .number(Double($0.modifiers)) } ?? .null,
             "showNewIconHint": .bool(showNewIconHint),
+            "autoHideNewItems": .bool(autoHideNewItems),
             "hasCompletedOnboarding": .bool(hasCompletedOnboarding),
             "updateAutomatically": .bool(updateAutomatically),
             "engineOverride": .string(engineOverride),
@@ -178,6 +187,10 @@ final class SettingsStore: ObservableObject {
             case "showNewIconHint":
                 guard let newValue = value.boolValue else { throw SettingsError.invalidValue(key, "expected a boolean") }
                 if showNewIconHint != newValue { showNewIconHint = newValue; changed.append(key) }
+
+            case "autoHideNewItems":
+                guard let newValue = value.boolValue else { throw SettingsError.invalidValue(key, "expected a boolean") }
+                if autoHideNewItems != newValue { autoHideNewItems = newValue; changed.append(key) }
 
             case "hasCompletedOnboarding":
                 guard let newValue = value.boolValue else { throw SettingsError.invalidValue(key, "expected a boolean") }

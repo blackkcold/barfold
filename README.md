@@ -13,7 +13,7 @@
   <a href="https://github.com/blackkcold/barfold/releases"><img src="https://img.shields.io/github/v/release/blackkcold/barfold?include_prereleases" alt="Release"></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-black?logo=apple&logoColor=white" alt="macOS 14+">
   <img src="https://img.shields.io/badge/Swift-6.0-F05138?logo=swift&logoColor=white" alt="Swift 6">
-  <img src="https://img.shields.io/badge/permissions-zero-2ea44f" alt="Zero permissions">
+  <img src="https://img.shields.io/badge/core%20permissions-zero-2ea44f" alt="Core: zero permissions">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT"></a>
   <a href="https://github.com/blackkcold/barfold/stargazers"><img src="https://img.shields.io/github/stars/blackkcold/barfold?style=social" alt="Stars"></a>
 </p>
@@ -24,7 +24,7 @@
 
 ## 它做什么
 
-BarFold 在菜单栏放一根分隔符和一个箭头。收起时把分隔符撑到屏幕外，左侧图标被推出可视区；展开时恢复。整个过程不申请辅助功能、屏幕录制、输入监控或通知权限。
+BarFold 在菜单栏放一根分隔符和一个箭头。收起时把分隔符撑到屏幕外，左侧图标被推出可视区；展开时恢复。折叠、悬停、热键、登录启动全程不申请辅助功能、屏幕录制、输入监控或通知权限。只有可选的「菜单栏图标管理」会请求辅助功能权限，且仅在你主动开启时请求。
 
 ## 功能
 
@@ -36,6 +36,7 @@ BarFold 在菜单栏放一根分隔符和一个箭头。收起时把分隔符撑
 - **登录启动**：`SMAppService` 优先，`LaunchAgent` 兜底。
 - **原生设置窗 + 引导 + 折叠演示**。
 - **失败兜底**：引擎异常、退出、睡眠先展开。
+- **菜单栏图标管理**（可选辅助功能）：按 App 列出图标，两组拖拽即可换组或排序，支持多选、撤销与容量提示；新图标自动移入隐藏组最左端。
 - **CLI/Agent 接口**：Unix socket + JSON Lines。
 
 ## 截图
@@ -86,7 +87,9 @@ CLI 位于 `BarFold.app/Contents/Helpers/barfold`。退出码：`0` 成功、`2`
 
 ## 权限
 
-零 TCC 权限。设置与日志在 `~/Library/Application Support/BarFold/`；控制 socket 为 `0600` 并校验 peer UID；不监听 TCP。只有配置 Sparkle feed 与 EdDSA 公钥后才会联网检查更新。
+**核心功能零 TCC 权限**：折叠、悬停、热键、自动收回、多屏、登录启动都不需要任何授权。设置与日志在 `~/Library/Application Support/BarFold/`；控制 socket 为 `0600` 并校验 peer UID；不监听 TCP。只有配置 Sparkle feed 与 EdDSA 公钥后才会联网检查更新。
+
+**可选的图标管理需要辅助功能**：设置里的「菜单栏」页要按 App 列出图标并在设置内拖动排序，必须读取其他进程的 Accessibility 树；macOS 26 不允许写入菜单栏项的 `AXPosition`，移动只能通过合成 `⌘`-拖拽完成。未授权时该页面给出明确降级说明，核心折叠功能不受影响；启动时不会弹出授权请求。
 
 ## 环境与限制
 

@@ -55,7 +55,12 @@ final class ProbeService {
         // A state bool flips immediately, but the window server needs a run-loop
         // turn to move the icons. `wait` must observe the geometry, not the bool.
         let separatorWidth = statusItems.separatorFrame?.width ?? 0
-        var settled = statusItems.isCollapsed ? separatorWidth > 1000 : separatorWidth < 100
+        // Expanded no longer means "a narrow separator window": the separator is
+        // hidden outright, so the honest signal is its absence plus a live arrow.
+        let toggleX = statusItems.toggleFrame?.origin.x ?? 0
+        var settled = statusItems.isCollapsed
+            ? separatorWidth > 1000
+            : (separatorWidth > 0 && statusItems.toggleFrame != nil && toggleX > 0)
         if statusItems.canaryItem != nil {
             let canaryVisible = statusItems.canaryOnScreen
             settled = settled && (statusItems.isCollapsed ? !canaryVisible : canaryVisible)

@@ -80,6 +80,12 @@ struct CLI {
             return hotkeyCommand()
         case "engine":
             return engineCommand()
+        case "items":
+            return itemsCommand()
+        case "layout":
+            return layoutCommand()
+        case "permissions":
+            return permissionsCommand()
         case "logs":
             return logsCommand()
         case "hover":
@@ -184,6 +190,42 @@ struct CLI {
         return 5
     }
 
+    private func awaitJob(_ jobID: String, verb: String) -> Int32 {
+        let deadline = Date().addingTimeInterval(max(timeout, 45))
+        var lastMessage = ""
+        while Date() < deadline {
+            usleep(250_000)
+            guard let poll = try? client().send(ControlRequest(
+                command: ControlCommand.itemsJob,
+                arguments: .object(["id": .string(jobID)])
+            )), let job = poll.data?["job"], let state = job["state"]?.stringValue else {
+                continue
+            }
+            if state == "done" {
+                if jsonOutput {
+                    printData(job)
+                } else {
+                    let completed = job["completed"]?.intValue ?? 0
+                    let planned = job["planned"]?.intValue ?? 0
+                    let ms = Int(job["durationMs"]?.doubleValue ?? 0)
+                    print("\(verb)完成：\(completed)/\(planned) 个，\(ms)ms")
+                }
+                return 0
+            }
+            if state == "failed" {
+                let message = job["error"]?["message"]?.stringValue ?? "\(verb)失败"
+                printError(code: job["error"]?["code"]?.stringValue ?? "move_failed", message: message)
+                return 4
+            }
+            if !jsonOutput, let message = job["message"]?.stringValue, message != lastMessage {
+                lastMessage = message
+                FileHandle.standardError.write(Data("… \(message)\n".utf8))
+            }
+        }
+        printError(code: "timeout", message: "\(verb)任务未在限定时间内结束")
+        return 5
+    }
+
     private func settingsCommand() -> Int32 {
         guard let subcommand = rest.first else {
             return usageError("settings needs get or set")
@@ -192,7 +234,15 @@ struct CLI {
         case "get":
             return perform(ControlRequest(command: ControlCommand.settingsGet), render: renderSettings)
         case "open":
-            return simpleCommand(ControlCommand.appSettings, render: nil)
+            var tab: String?
+            if let index = rest.firstIndex(of: "--tab"), index + 1 < rest.count {
+                tab = rest[index + 1]
+            }
+            let request = ControlRequest(
+                command: ControlCommand.appSettings,
+                arguments: tab.map { .object(["tab": .string($0)]) }
+            )
+            return perform(request, render: nil)
         case "set":
             let pairs = rest.dropFirst()
             guard !pairs.isEmpty else {
@@ -309,6 +359,126 @@ struct CLI {
             arguments: .object(["durationMs": .number(Double(duration))])
         )
         return perform(request, render: renderStatus)
+    }
+
+    private func itemsCommand() -> Int32 {
+        guard let subcommand = rest.first else {
+            return usageError("items needs list or move")
+        }
+        switch subcommand {
+        case "list":
+            return perform(ControlRequest(command: ControlCommand.itemsList), render: renderItems)
+        case "move":
+            return itemsMoveCommand()
+        case "undo":
+            return itemsUndoCommand()
+        case "job":
+            return perform(ControlRequest(command: ControlCommand.itemsJob), render: nil)
+        default:
+            return usageError("items needs list or move")
+        }
+    }
+
+    private func itemsUndoCommand() -> Int32 {
+        do {
+            let response = try client().send(ControlRequest(command: ControlCommand.itemsUndo))
+            guard response.ok, let jobID = response.data?["job"]?["id"]?.stringValue else {
+                printError(code: response.error?.code ?? "internal_error",
+                           message: response.error?.message ?? "nothing to undo")
+                return exitCode(for: response.error?.code)
+            }
+            return awaitJob(jobID, verb: "撤销")
+        } catch {
+            printError(code: "app_unavailable", message: error.localizedDescription)
+            return 3
+        }
+    }
+
+    /// Starts a move and polls the job. The drag takes about a second, and a cold
+    /// scan can take longer, so the CLI waits instead of blocking the app.
+    private func itemsMoveCommand() -> Int32 {
+        guard rest.count >= 2 else {
+            return usageError("items move needs an item id")
+        }
+        var ids: [String] = []
+        var cursor = 1
+        while cursor < rest.count, !rest[cursor].hasPrefix("--") {
+            ids.append(rest[cursor])
+            cursor += 1
+        }
+        guard !ids.isEmpty else {
+            return usageError("items move needs at least one item id")
+        }
+        var group = "hidden"
+        var index = 0
+        var before: String?
+        while cursor < rest.count {
+            switch rest[cursor] {
+            case "--group":
+                guard cursor + 1 < rest.count else { return usageError("--group needs visible or hidden") }
+                group = rest[cursor + 1]
+                cursor += 2
+            case "--index":
+                guard cursor + 1 < rest.count, let value = Int(rest[cursor + 1]) else {
+                    return usageError("--index needs a number")
+                }
+                index = max(0, value)
+                cursor += 2
+            case "--before":
+                guard cursor + 1 < rest.count else { return usageError("--before needs an item id") }
+                before = rest[cursor + 1]
+                cursor += 2
+            default:
+                return usageError("unknown option \(rest[cursor])")
+            }
+        }
+        guard group == "visible" || group == "hidden" else {
+            return usageError("--group must be visible or hidden")
+        }
+
+        let request = ControlRequest(
+            command: ControlCommand.itemsMove,
+            arguments: .object([
+                "ids": .array(ids.map { .string($0) }),
+                "group": .string(group),
+                "index": .number(Double(index)),
+                "before": before.map { .string($0) } ?? .null,
+            ])
+        )
+        do {
+            let response = try client().send(request)
+            guard response.ok, let jobID = response.data?["job"]?["id"]?.stringValue else {
+                printError(code: response.error?.code ?? "internal_error",
+                           message: response.error?.message ?? "items.move did not return a job")
+                return exitCode(for: response.error?.code)
+            }
+
+            return awaitJob(jobID, verb: "移动")
+        } catch {
+            printError(code: "app_unavailable", message: error.localizedDescription)
+            return 3
+        }
+    }
+
+    private func layoutCommand() -> Int32 {
+        guard let subcommand = rest.first else {
+            return usageError("layout needs get or snapshot")
+        }
+        switch subcommand {
+        case "get":
+            return perform(ControlRequest(command: ControlCommand.layoutGet), render: renderLayout)
+        case "snapshot":
+            return perform(ControlRequest(command: ControlCommand.layoutSnapshot), render: renderLayout)
+        default:
+            return usageError("layout needs get or snapshot")
+        }
+    }
+
+    private func permissionsCommand() -> Int32 {
+        guard rest.isEmpty || rest.first == "status" else {
+            return usageError("permissions needs status")
+        }
+        return perform(ControlRequest(command: ControlCommand.permissionsStatus), render: renderPermissions)
     }
 
     private func logsCommand() -> Int32 {        guard let subcommand = rest.first, subcommand == "tail" else {
@@ -529,6 +699,76 @@ struct CLI {
         print(ok ? colorize("全部通过", "32") : colorize("存在问题", "31"))
     }
 
+    private func renderItems(_ data: JSONValue) {
+        let items = data["items"]?.arrayValue ?? []
+        let managed = items.filter { $0["managed"]?.boolValue == true }
+        let system = items.filter { $0["kind"]?.stringValue == "system" }
+        let trusted = data["axTrusted"]?.boolValue ?? false
+        let collapsed = data["collapsed"]?.boolValue ?? false
+        let arrow = data["arrowMinX"]?.doubleValue.map { String(format: "%.0f", $0) } ?? "?"
+
+        print("菜单栏图标  可管理 \(managed.count) / 系统 \(system.count)  AX=\(trusted ? "已授权" : "未授权")  收起=\(collapsed ? "是" : "否")  箭头 x=\(arrow)")
+
+        guard trusted else {
+            print(colorize("  需要辅助功能权限才能按 App 列出图标；用 ⌘ 拖动图标仍然可用。", "33"))
+            return
+        }
+
+        for group in ["visible", "hidden"] {
+            let members = managed
+                .filter { $0["group"]?.stringValue == group }
+                .sorted { ($0["index"]?.intValue ?? 0) < ($1["index"]?.intValue ?? 0) }
+            let title = group == "visible" ? "收起时仍显示" : "收起时隐藏"
+            print("\n\(title) (\(members.count))")
+            if members.isEmpty {
+                print("  —")
+                continue
+            }
+            for item in members {
+                let index = item["index"]?.intValue ?? 0
+                let name = item["appName"]?.stringValue ?? "?"
+                let title = item["title"]?.stringValue ?? ""
+                let detail = item["detail"]?.stringValue ?? ""
+                let suffix = title.isEmpty ? (detail.isEmpty ? "" : "  \(detail)") : "  \(title)"
+                print("  \(index)  \(name)\(suffix)    [\(item["id"]?.stringValue ?? "?")]")
+            }
+        }
+
+        if !system.isEmpty {
+            print("\n系统菜单栏 (\(system.count))")
+            for item in system.sorted(by: { ($0["x"]?.doubleValue ?? 0) < ($1["x"]?.doubleValue ?? 0) }) {
+                let group = item["observedGroup"]?.stringValue == "visible" ? "显示" : "隐藏"
+                print("  \(group)  \(item["appName"]?.stringValue ?? "?")  x=\(int(item["x"]))")
+            }
+        }
+    }
+
+    private func renderLayout(_ data: JSONValue) {
+        let layout = data["layout"]?.objectValue ?? data.objectValue ?? [:]
+        let path = layout["path"]?.stringValue ?? "?"
+        let visible = layout["visible"]?.arrayValue?.compactMap(\.stringValue) ?? []
+        let hidden = layout["hidden"]?.arrayValue?.compactMap(\.stringValue) ?? []
+        print("布局文件  \(path)")
+        print("收起时仍显示 (\(visible.count))")
+        for id in visible { print("  \(id)") }
+        print("收起时隐藏 (\(hidden.count))")
+        for id in hidden { print("  \(id)") }
+        if let error = layout["error"]?.stringValue, !error.isEmpty {
+            print(colorize(error, "33"))
+        }
+        if layout["compatible"]?.boolValue == false {
+            print(colorize("布局版本不兼容，已忽略。", "33"))
+        }
+    }
+
+    private func renderPermissions(_ data: JSONValue) {
+        let trusted = data["axTrusted"]?.boolValue ?? false
+        print("辅助功能  \(trusted ? "已授权" : "未授权")")
+        print("核心折叠  \(data["coreRequiresAccessibility"]?.boolValue == true ? "需要权限" : "零权限")")
+        print("图标管理  \(data["itemManagementRequiresAccessibility"]?.boolValue == true ? "需要辅助功能" : "不需要")")
+        if let detail = data["detail"]?.stringValue { print(detail) }
+    }
+
     private func renderSettings(_ data: JSONValue) {
         guard let object = data.objectValue else {
             printData(data)
@@ -590,6 +830,10 @@ struct CLI {
           barfold hotkey get | set <combo> | clear
           barfold hover simulate --duration 400
           barfold engine list | select <auto|lengthSpacer|unsupported>
+          barfold items list [--json]
+          barfold items move <id...> --group visible|hidden [--before <id>] [--index N]
+          barfold layout get | snapshot
+          barfold permissions status
           barfold loginitem status | enable | disable
           barfold update status | check | install
           barfold logs tail [-n 50]

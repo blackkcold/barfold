@@ -4,6 +4,7 @@ import SwiftUI
 
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
+    case menuBar
     case interaction
     case diagnostics
     case about
@@ -13,6 +14,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return L10n.t("通用", "General")
+        case .menuBar: return L10n.t("菜单栏", "Menu Bar")
         case .interaction: return L10n.t("交互", "Interaction")
         case .diagnostics: return L10n.t("诊断", "Diagnostics")
         case .about: return L10n.t("关于", "About")
@@ -22,6 +24,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .general: return L10n.t("启动、更新与菜单栏提示", "Launch, updates and menu bar hints")
+        case .menuBar: return L10n.t("按 App 分组与排序菜单栏图标", "Group and order menu bar icons by app")
         case .interaction: return L10n.t("悬停、自动收回与全局热键", "Hover, auto-collapse and global shortcut")
         case .diagnostics: return L10n.t("引擎状态、屏幕与恢复工具", "Engine, displays and recovery tools")
         case .about: return L10n.t("版本、命令行接口与许可", "Version, CLI and credits")
@@ -31,6 +34,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .general: return "gearshape"
+        case .menuBar: return "menubar.rectangle"
         case .interaction: return "cursorarrow.motionlines"
         case .diagnostics: return "stethoscope"
         case .about: return "info.circle"
@@ -62,6 +66,13 @@ struct SettingsActions {
     var resetOnboarding: () -> Void
     var arrowFrame: () -> String
     var socketPath: () -> String
+    var itemsTrusted: () -> Bool
+    var refreshItems: (@escaping ([MenuBarItemSnapshot], MenuBarCapacity) -> Void) -> Void
+    var moveItems: ([String], MenuBarItemGroup, String?) -> Bool
+    var undoItems: () -> Bool
+    var currentMoveJob: () -> MenuBarMoveJob?
+    var canUndoItems: () -> Bool
+    var openAccessibilitySettings: () -> Void
 }
 
 struct SettingsView: View {
@@ -221,6 +232,8 @@ struct SettingsView: View {
         switch navigation.tab {
         case .general:
             general
+        case .menuBar:
+            MenuBarItemsView(actions: actions)
         case .interaction:
             interaction
         case .diagnostics:

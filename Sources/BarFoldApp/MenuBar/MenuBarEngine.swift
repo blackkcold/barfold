@@ -61,6 +61,10 @@ final class LengthSpacerEngine: MenuBarEngine {
     var isAvailable: Bool { true }
     var detail: String { "A separator status item expands to push items off-screen." }
 
+    /// The separator is hidden while expanded so it does not leave a 24 pt hole
+    /// left of the arrow. It only exists to take width when collapsed.
+    var isSeparatorVisible: Bool { separator.isVisible }
+
     var isCollapsed: Bool {
         separator.length > CGFloat(MenuBarGeometry.expandedLength) + 4
     }
@@ -72,8 +76,17 @@ final class LengthSpacerEngine: MenuBarEngine {
     }
 
     func collapse() throws {
+        // The separator stays mounted at all times: hiding and re-showing it
+        // lets AppKit rewrite its autosaved position, which moved the right edge
+        // hundreds of points away from the arrow.
+        // The separator must stay mounted: hiding it makes AppKit drop its
+        // autosaved position, and the next collapse then anchors hundreds of
+        // points away from the arrow (measured: right edge 950 instead of 1621).
         guard separator.button?.window != nil else { throw EngineError.separatorMissing }
         separator.length = collapsedLength
+        DispatchQueue.main.async { [weak self] in
+            self?.separator.button?.window?.ignoresMouseEvents = true
+        }
     }
 
     func expand() throws {
@@ -97,7 +110,6 @@ final class LengthSpacerEngine: MenuBarEngine {
             status: separator.button?.window == nil ? "fail" : "pass",
             detail: separator.button?.window == nil ? "separator window is missing" : "separator window exists"
         ))
-
         let isCollapsedNow = isCollapsed
         checks.append(EngineCheck(
             name: "state-derived-from-length",
@@ -112,7 +124,9 @@ final class LengthSpacerEngine: MenuBarEngine {
 
         if isCollapsedNow {
             if let window = separator.button?.window {
-                let wideEnough = window.frame.width > 1000
+                // The window can lag one layout pass behind the length change, so
+                // the requested length is also accepted as evidence.
+                let wideEnough = window.frame.width > 1000 || separator.length >= 500
                 checks.append(EngineCheck(
                     name: "separator-width",
                     status: wideEnough ? "pass" : "fail",

@@ -4,7 +4,7 @@
 
 ## 项目
 
-BarFold 是一个零权限的 macOS 菜单栏折叠工具。Swift 6 编译器 / Swift 5 language mode，SwiftPM + AppKit + SwiftUI，唯一第三方依赖 Sparkle 2。
+BarFold 是一个核心零权限的 macOS 菜单栏折叠工具。Swift 6 编译器 / Swift 5 language mode，SwiftPM + AppKit + SwiftUI，唯一第三方依赖 Sparkle 2。
 
 - Bundle ID：`com.haoran.BarFold`（首次发版后冻结）
 - 最低系统：macOS 14
@@ -37,12 +37,14 @@ scripts/release.sh --adhoc
 6. **自动收回只在用户主动展开后武装**（click/hover/hotkey/menu），启动恢复、CLI expand、设置展开不武装。菜单层 101 打开时暂停收回。
 7. **悬停只在右半屏、菜单栏带内、非状态项窗口、非箭头、非菜单打开时触发**；10Hz 轮询，不申请权限。
 8. **不做未验证的 macOS 27 引擎**。27+ 返回 `UnsupportedEngine`，保持展开并明确提示。私有 API 只在未来实验开关中出现。
-9. **零权限**：不申请辅助功能、屏幕录制、输入监控、通知。聚合浮窗（需要权限）不在 v1。
+9. **核心零权限**：折叠、悬停、热键、自动收回、登录启动不申请辅助功能、屏幕录制、输入监控、通知。可选的图标管理（`items.*` / `layout.*` 命令、设置里的菜单栏页）只在用户主动开启时请求辅助功能；未授权必须明确降级，不能假装可用。聚合浮窗（需要权限）不在 v1。
 10. **CLI 是一等接口**：Unix socket `0600` + peer UID 校验；JSON Lines；退出码 `0/2/3/4/5` 稳定；破坏性变更必须版本化。
 11. **固定身份只备份不重建**。重建证书会重置 TCC、通知和登录项审批。见 `docs/signing.md`。
 12. **不复用 GPL 代码**（Ice/Thaw/Dimble）。Hidden Bar（MIT）、menubar-hide（MIT）、MenuTidy（Unlicense）只作思路参考时也要保留归属说明。
 13. **UX 是验收项**：设置窗/引导在浅色/深色、降低动态、键盘操作下都要可用；不牺牲可读性换“高级感”。
 14. **失败软着陆**：任何引擎/探针失败都退回展开，并在 `doctor` 中给出可读原因。
+15. **移动别人的图标只有合成 ⌘-拖拽一条路**（macOS 26.4 实测）：菜单栏项的 `AXPosition` 全部 `settable=false`，AX 只能读不能移。任何移动都必须在用户显式操作后执行，先快照、失败回滚。唯一例外是用户开启的「新图标自动移入隐藏组」：只处理新出现的项，插到隐藏组最左侧，绝不重排已有图标。
+16. **分隔符永不隐藏**：`isVisible = false` 会让 AppKit 删除 `NSStatusItem Preferred Position`，重新显示后右缘会落到几百点之外，折叠直接失效（实测 1621 → 950）。AppKit 还会把 `isVisible` 持久化到 `NSStatusItem VisibleCC`，启动时必须清掉并强制 `isVisible = true`。展开态最小长度 1（窗口 17pt），0 会让项消失。
 
 ## 目录
 

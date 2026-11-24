@@ -65,7 +65,10 @@ public struct ScreenDescriptor: Codable, Sendable, Equatable {
 }
 
 public enum MenuBarGeometry {
-    public static let expandedLength: Double = 8
+    /// Smallest length that keeps the separator mounted. AppKit adds 16 pt of
+    /// window padding, so this still occupies ~17 pt; 0 makes the item vanish and
+    /// drop its autosaved position, which permanently breaks the collapse anchor.
+    public static let expandedLength: Double = 1
     public static let maximumCollapsedLength: Double = 10_000
     public static let minimumMenuBarHeight: Double = 30
 

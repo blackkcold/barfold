@@ -63,8 +63,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         statusItems = StatusItemController(capability: capability, testMode: testMode)
+        // Apply the expanded geometry immediately. A separator left visible at
+        // launch would keep its ~24 pt hole until the first toggle.
+        if !(settings.hasCompletedOnboarding && settings.lastCollapsed && !safeMode) {
+            try? statusItems.engine.expand()
+        }
         menuController = MenuController(settings: settings)
         wireMenu()
+
+        // The first accessibility call to each app costs 40–200 ms; warm the
+        // connections after launch so the item list is instant on first use.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            MenuBarItemCatalog.warmUp()
+        }
 
         statusItems.onToggle = { [weak self] in
             self?.toggle(reason: "click")
@@ -133,7 +144,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.toggle(reason: reason)
         }
         router.onQuit = { NSApp.terminate(nil) }
-        router.onOpenSettings = { [weak self] in self?.openSettings(tab: .general) }
+        router.onOpenSettings = { [weak self] tab in
+            let resolved = SettingsTab(rawValue: tab ?? "") ?? .general
+            self?.openSettings(tab: resolved)
+        }
         router.onHotkeyChanged = { [weak self] in self?.applyHotkey() }
         router.onHoverSimulate = { [weak self] durationMs in self?.simulateHover(durationMs) }
         router.updateStatus = { [weak self] in
@@ -226,6 +240,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWorkspace.didWakeNotification,
             object: nil
         )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(workspaceDidLaunchApp),
+            name: NSWorkspace.didLaunchApplicationNotification,
+            object: nil
+        )
+        router.startNewItemWatcher()
 
         if !safeMode, settings.hasCompletedOnboarding, settings.lastCollapsed {
             startLaunchStabilizer(reason: "launch")
@@ -402,6 +423,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func workspaceDidLaunchApp() {
+        router.handleAppLaunched()
+    }
+
     @objc private func workspaceDidWake() {
         guard settings.hasCompletedOnboarding, settings.lastCollapsed, !safeMode else { return }
         startLaunchStabilizer(reason: "wake")
@@ -465,7 +490,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             quit: { NSApp.terminate(nil) },
             resetOnboarding: { [weak self] in self?.resetOnboarding() },
             arrowFrame: { [weak self] in self?.arrowFrameString ?? "—" },
-            socketPath: { BarFoldPaths.socketURL.path }
+            socketPath: { BarFoldPaths.socketURL.path },
+            itemsTrusted: { [weak self] in self?.router.itemsTrusted ?? false },
+            refreshItems: { [weak self] completion in self?.router.refreshItems(completion) },
+            moveItems: { [weak self] ids, group, before in
+                self?.router.startItemMove(ids: ids, group: group, before: before, index: 0) != nil
+            },
+            undoItems: { [weak self] in self?.router.undoItems() != nil },
+            currentMoveJob: { [weak self] in self?.router.currentMoveJob },
+            canUndoItems: { [weak self] in self?.router.canUndoItems ?? false },
+            openAccessibilitySettings: { [weak self] in self?.router.openAccessibilitySettings() }
         )
     }
 
