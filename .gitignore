@@ -1,0 +1,19 @@
+.DS_Store
+.build/
+.swiftpm/
+release/
+output/
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+.env
+*.p12
+*.p12.password
+*.key
+*.edseed
+
+# Compiler artifacts accidentally written to the repo root
+/*.d
+/*.dia
+/*.o
+/*.swiftdeps
