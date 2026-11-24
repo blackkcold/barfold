@@ -44,7 +44,7 @@ scripts/release.sh --adhoc
 13. **UX 是验收项**：设置窗/引导在浅色/深色、降低动态、键盘操作下都要可用；不牺牲可读性换“高级感”。
 14. **失败软着陆**：任何引擎/探针失败都退回展开，并在 `doctor` 中给出可读原因。
 15. **移动别人的图标只有合成 ⌘-拖拽一条路**（macOS 26.4 实测）：菜单栏项的 `AXPosition` 全部 `settable=false`，AX 只能读不能移。任何移动都必须在用户显式操作后执行，先快照、失败回滚。唯一例外是用户开启的「新图标自动移入隐藏组」：只处理新出现的项，插到隐藏组最左侧，绝不重排已有图标。
-16. **分隔符永不隐藏**：`isVisible = false` 会让 AppKit 删除 `NSStatusItem Preferred Position`，重新显示后右缘会落到几百点之外，折叠直接失效（实测 1621 → 950）。AppKit 还会把 `isVisible` 持久化到 `NSStatusItem VisibleCC`，启动时必须清掉并强制 `isVisible = true`。展开态最小长度 1（窗口 17pt），0 会让项消失。
+16. **分隔符永不隐藏**：`isVisible = false` 会让 AppKit 删除 `NSStatusItem Preferred Position`，重新显示后右缘会落到几百点之外，折叠直接失效（实测 1621 → 950）。AppKit 还会把 `isVisible` 持久化到 `NSStatusItem VisibleCC`，启动时必须清掉并强制 `isVisible = true`。展开态最小长度 1（窗口 17pt），0 会让项消失。分隔符内容区只有 1pt，宽于它的图像会被裁掉；竖线必须画成 1×12 的模板图并设 `imageScaling = .scaleNone`。
 
 ## 目录
 

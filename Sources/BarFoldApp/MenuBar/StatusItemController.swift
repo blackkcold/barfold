@@ -74,6 +74,34 @@ final class StatusItemController: NSObject {
         defaults.synchronize()
     }
 
+    /// A 1 pt hairline that turns the separator's 17 pt window into a deliberate
+    /// rule instead of an invisible hole.
+    ///
+    /// The image is exactly as wide as the item's content area (the separator's
+    /// `length`), because AppKit clips anything wider: a 17 pt canvas rendered
+    /// nothing at all, since only its transparent centre column survived. The
+    /// 16 pt of window padding on either side is what gives the rule its air.
+    static func separatorRuleImage() -> NSImage {
+        let lineHeight: CGFloat = 12
+        let imageHeight: CGFloat = 24
+        let image = NSImage(size: NSSize(width: 1, height: imageHeight), flipped: false) { rect in
+            NSColor.black.withAlphaComponent(0.35).setFill()
+            NSBezierPath(
+                roundedRect: NSRect(
+                    x: 0,
+                    y: (rect.height - lineHeight) / 2,
+                    width: 1,
+                    height: lineHeight
+                ),
+                xRadius: 0.5,
+                yRadius: 0.5
+            ).fill()
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
     private func createItems() {
         // Creation order is load-bearing: later items appear to the left. The
         // arrow must exist first so it ends up right of the separator.
@@ -100,8 +128,10 @@ final class StatusItemController: NSObject {
             separatorItem?.isVisible = true
             if let separator = separatorItem {
                 separator.button?.title = ""
-                separator.button?.image = nil
-                separator.button?.isEnabled = false
+                separator.button?.imagePosition = .imageOnly
+                separator.button?.imageScaling = .scaleNone
+                separator.button?.image = Self.separatorRuleImage()
+                separator.button?.isEnabled = true
                 separator.button?.setAccessibilityElement(false)
                 // The 10,000pt window must never swallow clicks meant for the
                 // desktop behind the hidden area.

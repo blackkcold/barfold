@@ -61,8 +61,10 @@ final class LengthSpacerEngine: MenuBarEngine {
     var isAvailable: Bool { true }
     var detail: String { "A separator status item expands to push items off-screen." }
 
-    /// The separator is hidden while expanded so it does not leave a 24 pt hole
-    /// left of the arrow. It only exists to take width when collapsed.
+    /// The separator stays mounted for its whole lifetime (AGENTS invariant 16):
+    /// hiding or recreating it makes AppKit drop its autosaved position and the
+    /// next collapse anchors hundreds of points away. When expanded its length is
+    /// 1, which leaves a ~17 pt window that a hairline turns into a divider.
     var isSeparatorVisible: Bool { separator.isVisible }
 
     var isCollapsed: Bool {

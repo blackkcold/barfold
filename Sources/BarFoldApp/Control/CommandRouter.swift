@@ -497,8 +497,8 @@ final class CommandRouter {
             return
         }
         let arrow = cgRect(arrowFrame)
-        // The separator is hidden while expanded, so its window is gone. The
-        // hidden group's right edge is then simply the left side of the arrow.
+        // The separator window normally exists; fall back to the arrow's left
+        // edge if AppKit has not laid it out yet.
         let separator = statusItems.separatorFrame.map(cgRect)
             ?? Rect(x: arrow.x - 8, y: arrow.y, width: 2, height: arrow.height)
         let screens = ScreenMapping.descriptors.map(\.frame)

@@ -55,7 +55,7 @@ assert data.get("ok", True) is not False, data
 assert data["collapsed"] is False, data
 assert data["toggleOnScreen"] is True, data
 assert data["layoutSettled"] is True, data
-assert data["separatorWindowWidth"] < 100, data
+assert data["separatorWindowWidth"] <= 20, data
 print("✓ initial: expanded, arrow on screen, layout settled")
 PY
 
@@ -88,7 +88,7 @@ data = json.load(open(sys.argv[1]))
 initial = int(sys.argv[2])
 assert data["collapsed"] is False, data
 assert data["layoutSettled"] is True, data
-assert data["separatorWindowWidth"] < 100, data
+assert data["separatorWindowWidth"] <= 20, data
 assert data["canaryOnScreen"] is True, data
 assert data["visibleStatusWindowCount"] == initial, (data["visibleStatusWindowCount"], initial)
 print(f"✓ expanded: canary visible, visible items back to {initial}")
